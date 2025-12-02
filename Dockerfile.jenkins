@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     ansible \
     gnupg \
+    ant \
     && rm -rf /var/lib/apt/lists/*
 
 # ----------------------------
@@ -57,3 +58,4 @@ RUN apt-get update && apt-get install -y curl gpg apt-transport-https \
 
 # Switch back to Jenkins user
 USER jenkins
+
