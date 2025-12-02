@@ -1,0 +1,97 @@
+# --------------------------------------------------------
+# Stage 1: Plugin Installation (Builder)
+# --------------------------------------------------------
+FROM jenkins/jenkins:lts AS plugin-builder
+
+USER root
+
+# Add plugins.txt to the image (must be in same directory)
+COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
+
+# Use Jenkins plugin manager CLI to pre-install plugins
+RUN jenkins-plugin-cli --plugin-file /usr/share/jenkins/ref/plugins.txt
+
+
+# --------------------------------------------------------
+# Stage 2: Final Jenkins Image (Slim & Optimized)
+# --------------------------------------------------------
+FROM jenkins/jenkins:lts
+
+USER root
+
+# Copy pre-installed plugins from builder stage
+COPY --from=plugin-builder /usr/share/jenkins/ref/plugins /usr/share/jenkins/ref/plugins
+
+# Install essential system dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    unzip \
+    git \
+    python3 \
+    python3-pip \
+    gnupg \
+    apt-transport-https \
+    ant \
+    maven \
+    && rm -rf /var/lib/apt/lists/*
+
+
+# --------------------------------------------------------
+# Install DevOps Tools (using lightweight methods)
+# --------------------------------------------------------
+
+# ----------------------------
+# Install kubectl (latest stable)
+# ----------------------------
+RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+    && install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl \
+    && rm kubectl
+
+
+
+# ----------------------------
+# Install Terraform (latest release dynamically)
+# ----------------------------
+RUN TERRAFORM_VERSION=$(curl -s https://checkpoint-api.hashicorp.com/v1/check/terraform \
+    | grep -oP '"current_version":\s*"\K[^"]+') \
+    && curl -fsSL https://releases.hashicorp.com/terraform/${TERRAFORM_VERSION}/terraform_${TERRAFORM_VERSION}_linux_amd64.zip -o terraform.zip \
+    && unzip terraform.zip \
+    && mv terraform /usr/local/bin/ \
+    && rm terraform.zip
+
+# ----------------------------
+# Install Docker Compose (latest)
+# ----------------------------
+RUN curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" \
+    -o /usr/local/bin/docker-compose \
+    && chmod +x /usr/local/bin/docker-compose
+
+
+# ----------------------------
+# Install Helm (latest via Buildkite repo)
+# ----------------------------
+RUN apt-get update && apt-get install -y curl gpg apt-transport-https \
+    && curl -fsSL https://packages.buildkite.com/helm-linux/helm-debian/gpgkey | gpg --dearmor | tee /usr/share/keyrings/helm.gpg > /dev/null \
+    && echo "deb [signed-by=/usr/share/keyrings/helm.gpg] https://packages.buildkite.com/helm-linux/helm-debian/any/ any main" \
+       | tee /etc/apt/sources.list.d/helm-stable-debian.list \
+    && apt-get update \
+    && apt-get install -y helm \
+    && rm -rf /var/lib/apt/lists/*
+
+
+# --------------------------------------------------------
+# Install SonarScanner CLI
+# --------------------------------------------------------
+ENV SONAR_SCANNER_VERSION=7.3.0.5189
+
+RUN curl -fsSL "https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-${SONAR_SCANNER_VERSION}-linux-x64.zip" \
+    -o /tmp/sonar-scanner.zip \
+    && unzip /tmp/sonar-scanner.zip -d /opt/ \
+    && rm /tmp/sonar-scanner.zip \
+    && ln -s /opt/sonar-scanner-${SONAR_SCANNER_VERSION}-linux-x64/bin/sonar-scanner /usr/local/bin/sonar-scanner \
+    && chmod +x /usr/local/bin/sonar-scanner
+
+# --------------------------------------------------------
+# Final Setup
+# --------------------------------------------------------
+USER jenkins
