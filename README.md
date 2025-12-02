@@ -97,7 +97,7 @@ All services use Docker volumes for data persistence:
 
 **Stop all services:**
 ```bash
-docker-compose -f docker-compose-jenkins.yml -f docker-compose-nexus.yml -f docker-compose-sonarqube.yml -f docker-compose-nginx.yml down
+docker-compose -f docker-compose-jenkins.yml -f docker-compose-nexus.yml -f docker-compose-sonarqube.yml -f docker-compose-nginx.yml stop
 ```
 
 **View logs:**
@@ -108,6 +108,23 @@ docker-compose -f docker-compose-jenkins.yml logs -f jenkins
 **Restart service:**
 ```bash
 docker-compose -f docker-compose-jenkins.yml restart jenkins
+```
+
+**Check tool versions in Jenkins:**
+```bash
+# Check SonarScanner version
+docker exec -it jenkins sonar-scanner -v
+
+# Check Maven version
+docker exec -it jenkins mvn -v
+
+# Check Ant version
+docker exec -it jenkins ant -v
+```
+
+**Stop and remove all services:**
+```bash
+docker-compose -f docker-compose-jenkins.yml -f docker-compose-nexus.yml -f docker-compose-sonarqube.yml -f docker-compose-nginx.yml down
 ```
 
 ## 🔧 Customization
